@@ -1,0 +1,19 @@
+--- Starting RAG Pipeline ---
+Initializing LLM: llama3.2:latest...
+LLM initialized.
+Initializing embedding model: all-minilm:22M...
+Embedding model initialized.
+Loading vector store from 'chroma_db/' and collection 'ESP5G-DER'...
+Vector store loaded.
+Creating query engine...
+Query engine created.
+
+--- Making Query ---
+Question: What is the Network Exposure Function (NEF) in 5G systems?
+
+
+--- Response ---
+The Network Exposure Function (NEF) operates as a core intermediary functional entity responsible for securely exposing network events, configurations, and operational parameters made available by 3GPP network functions to external Application Functions (AFs). It provides bidirectional translation between the AF's service-level abstractions and the internal communication semantics of 3GPP network entities. This translation ensures syntactic and semantic interoperability between application-level service requests and the native data models of core network entities.
+
+--------------------
+

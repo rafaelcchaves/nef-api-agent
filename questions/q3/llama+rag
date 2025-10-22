@@ -1,0 +1,33 @@
+--- Starting RAG Pipeline ---
+Initializing LLM: llama3.2:latest...
+LLM initialized.
+Initializing embedding model: all-minilm:22M...
+Embedding model initialized.
+Loading vector store from 'chroma_db/' and collection 'ESP5G'...
+Vector store loaded.
+Creating query engine...
+Query engine created.
+
+--- Making Query ---
+Question: Describe the detailed data model and interaction flow involved in creating and managing an individual traffic influence subscription via the NEF Northbound Interface, including the roles of HTTP methods and associated data structures.
+
+
+--- Response ---
+The process of creating and managing an individual traffic influence subscription involves multiple interactions between the AF (Application Function) and the NEF (Network Element Function). 
+
+When a request is made for a new subscription, the AF initiates an HTTP POST request to create a new resource "Individual Traffic Influence Subscription". The URI for this request includes the AF Identifier and a unique subscription identifier. Upon successful creation, the NEF responds with a 201 Created status code and a Location header field containing the URI of the created resource.
+
+The Location header provides a reference point for subsequent requests from the AF to refer to this traffic influence subscription. This allows the AF to access the subscription's properties, such as its identifier, expiration date, or priority level, depending on the specific implementation.
+
+If an update is requested for the existing subscription, the AF initiates an HTTP PUT request, and the NEF responds with a 200 OK status code upon successful completion. For partial updates, the AF can use the PATCH method to modify selected properties of the subscription.
+
+In case of deletion, the AF sends an HTTP DELETE request to remove all properties associated with the traffic influence subscription, and the NEF responds with a 204 No Content status code if the operation is successful.
+
+The NEF interacts with other components in its management system, such as the BSF (Base Station Failure), PCF (Policy Control Function), or UDR (User Data Repository) depending on the specific requirements of the AF. These interactions are governed by defined services and protocols that facilitate seamless communication between the different functional elements.
+
+To create a new subscription, the NEF may interact with the UDR to retrieve necessary data for the subscription, if required. The NEF ensures that it handles errors from these services appropriately, returning a 500 Internal Server Error status code in case of any error responses.
+
+Throughout this interaction, HTTP methods (POST, PUT, PATCH, and DELETE) are used to initiate requests and manage the individual traffic influence subscriptions, while data structures such as resource URIs, subscription identifiers, and properties define the format and content of these interactions.
+
+--------------------
+

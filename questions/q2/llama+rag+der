@@ -1,0 +1,23 @@
+--- Starting RAG Pipeline ---
+Initializing LLM: llama3.2:latest...
+LLM initialized.
+Initializing embedding model: all-minilm:22M...
+Embedding model initialized.
+Loading vector store from 'chroma_db/' and collection 'ESP5G-DER'...
+Vector store loaded.
+Creating query engine...
+Query engine created.
+
+--- Making Query ---
+Question: How does the NEF support traffic influence procedures and what roles do the Policy Control?
+
+
+--- Response ---
+The NEF supports traffic influence procedures by allowing Application Functions (AFs) to interact with it to manage traffic routing policies dynamically. The AF can use the Traffic Influence API to query, create, update, or delete traffic influence subscription resources, thereby influencing User Plane path selection for application-optimized service delivery.
+
+Additionally, the NEF utilizes the Npcf_PolicyAuthorization service to provide policy control capabilities that support fine-grained customization of how traffic paths are resolved based on predefined policies, device context, or service-level objectives. This enables network functions to be exposed in a controlled manner, allowing AFs to optimize their interactions with the network according to specific requirements.
+
+By providing this level of control and customization, the NEF enables effective management of traffic routing policies, thereby playing a crucial role in optimizing the performance and efficiency of application-optimized services over 5G networks.
+
+--------------------
+

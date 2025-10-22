@@ -1,0 +1,61 @@
+NEF Northbound Interface
+
+4.1 Overview
+
+The NEF Northbound Interface constitutes a critical logical boundary that mediates interaction between the Network Exposure Function (NEF) and the Application Function (AF). It defines a suite of RESTful APIs through which the AF securely accesses and consumes the network services, capabilities, and information flows exposed by underlying 3GPP network entities via the NEF. By standardizing these exposure mechanisms, the interface ensures secure abstraction, interoperability, and controlled utilization of 5G System (5GS) network functions by authorized external applications.
+
+This specification delineates not only the structural organization of these RESTful APIs but also the procedural behavior instantiated at the NEF in response to API invocations from the AF and to asynchronous event notifications propagated from internal 3GPP network functions. It provides an operational bridge between application-layer service logic and the control or user plane capabilities within the 5GS framework.
+
+At the architectural level, the stage 2 signaling flows and operational requirements governing this interface are comprehensively defined in 3GPP TS 23.502. The NEF Northbound Interface therefore supports a variety of standardized procedures, each corresponding to a discrete service paradigm essential for advanced network exposure:
+
+    Procedures for monitoring events and conditions originating in the 5GS network.
+
+    Procedures for device triggering within IoT and MTC domains.
+
+    Procedures for background data transfer (BDT) resource management.
+
+    Procedures for control plane (CP) parameter provisioning.
+
+    Procedures for Packet Flow Description (PFD) management.
+
+    Procedures for traffic influence and optimization.
+
+    Procedures for modifying the chargeable party during or at session establishment.
+
+    Procedures enabling AF session setup with guaranteed Quality of Service (QoS).
+
+Each of these procedural classes maps directly to a corresponding NEF-supported service as defined in 3GPP TS 23.502, including Nnef_EventExposure, Nnef_Trigger, Nnef_BDTPNegotiation, Nnef_ParameterProvision, Nnef_PFDManagement, Nnef_TrafficInfluence, Nnef_ChargeableParty, and Nnef_AFsessionWithQoS. Notably, for PFD Management, only the Create, Update, and Delete operations are pertinent within the scope of the NEF Northbound exposure context.
+
+4.2 Reference Model
+
+The Reference Model situates the NEF Northbound Interface at the interconnection plane between the NEF and one or more AFs, as illustrated in Figure 4.2.1. In this layered architecture, an AF may concurrently subscribe to services provided by multiple NEFs, while a single NEF can simultaneously serve multiple AFs. This many-to-many relationship enables scalable service exposure across diverse application domains and network slices.
+
+In practical deployments, the AF may reside within third-party administrative domains, thereby reinforcing the importance of standardized interfaces and security mechanisms that ensure mutual authentication and controlled access. Figures 4.2.1 and 4.2.2 represent, respectively, the Service-Based Interface (SBI) architecture and the reference point model for the Nnef Service (corresponding to reference point N33), both conceptually aligned with the system-level representation defined in 3GPP TS 23.502.
+
+4.3 Functional Elements
+
+4.3.1 Network Exposure Function (NEF)
+
+The NEF operates as a core intermediary functional entity responsible for securely exposing network events, configurations, and operational parameters made available by 3GPP network functions (NFs) to external AFs. Through standardized authorization and authentication processes, the NEF enforces network policy, integrity, and access control, thereby maintaining the confidentiality and accountability of exposed network capabilities.
+
+Functionally, the NEF provides bidirectional translation between the AF’s service-level abstractions and the internal communication semantics of 3GPP NFs. This translation ensures syntactic and semantic interoperability between application-level service requests and the native data models of core network entities. Additionally, the NEF may host the Packet Flow Description Function (PFDF), enabling the provisioning, storage, and retrieval of PFDs from the Unified Data Repository (UDR), as well as their subsequent distribution to the Session Management Function (SMF).
+
+An NEF instance may implement a subset of these capabilities depending on deployment context or exposure requirements. Furthermore, NEF instances typically operate within the same Public Land Mobile Network (PLMN) domain as the UDR they access, thus ensuring data locality and compliance with operator governance frameworks.
+
+4.3.2 Application Function (AF)
+
+The AF represents an application-layer functional entity that leverages NEF-mediated access to 3GPP Core Network capabilities. By utilizing NEF’s standardized exposure mechanisms, the AF can invoke policy control, event monitoring, and resource management functionalities without direct coupling to internal 3GPP service interfaces, thereby promoting service modularity and ecosystem expansion across vertical industries.
+
+4.4 Procedures Over the NEF Northbound Interface
+
+4.4.1 Introduction
+
+All network procedures operating over the NEF Northbound Interface derive their normative definitions and sequence flows from 3GPP TS 23.502. The subsequent subclauses articulate the procedural adaptations and mappings required to harmonize legacy SCEF and 5GS-specific NEF operations within the updated service-based architecture.
+
+4.4.2 Procedures for Monitoring
+
+The monitoring procedures, consistent with the specifications in subclause 4.4.2 of 3GPP TS 29.122, are applicable to the 5GS architecture with modifications that align nomenclature and functional mappings to the evolved 5G core: references to SCS/AS correspond to AF, SCEF to NEF, and HSS to UDM. Consequently, the NEF utilizes the Nudm_EventExposure service for UDM interactions and the Namf_EventExposure service for AMF communications. Monitoring of SUPI–PEI association supersedes earlier IMSI–IMEI(SV) relationships, reflecting 5G system identifiers.
+
+4.4.3–4.4.9 Adapted Procedures
+
+Subsequent procedural categories—including device triggering, background data transfer resource management, control plane parameter provisioning, PFD management, traffic influence optimization, chargeable party reassignment, and AF session configuration with specified QoS—inherit their base definitions from the corresponding clauses in 3GPP TS 29.122. Each is adapted for 5GS by substituting equivalent entities and service invocations, such as the NEF’s interaction with Nudm_SDM, Nudm_UECM, Npcf_BDTPolicyControl, Nudr_DataRepository, and Npcf_PolicyAuthorization services. These modifications ensure alignment with the Service-Based Architecture (SBA) paradigm underpinning the 5G Core, thereby enabling coherent service orchestration, dynamic traffic control, and policy-driven exposure within the network’s programmable interface framework.
