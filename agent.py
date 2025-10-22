@@ -2,6 +2,7 @@ import asyncio
 import os
 import argparse
 from llama_index.core.agent import FunctionAgent
+from llama_index.core.agent.workflow import AgentStream
 from llama_index.core import Settings, VectorStoreIndex
 from llama_index.core.tools import FunctionTool
 from llama_index.embeddings.ollama import OllamaEmbedding
@@ -73,6 +74,7 @@ async def main():
         tools.append(run_rag_tool)
 
     agent = FunctionAgent(
+        verbose=True,
         tools=tools,
         llm=llm,
         system_prompt="You are a system expert specializing in the Network Exposure Function (NEF) of 5G networks. Your role is to accurately understand the user’s request and generate precise curl commands that perform the required NEF operations. To accomplish this, you must fully comprehend the user’s intent, consult the NEF API documentation or relevant 3GPP references, and use all available tools and knowledge to ensure correctness. Every curl command you produce should be syntactically accurate, secure, and include appropriate headers, authentication tokens, parameters, and HTTP methods according to the API specification. Your responses must be clear, ready-to-execute examples that reflect best practices in 5G NEF data exposure and security. Accuracy, completeness, and understanding of the user’s intent are vital before generating the final output."
@@ -84,9 +86,11 @@ async def main():
         query = input("You: ")
         if query.lower() == "exit":
             break
-        response = await agent.run(user_msg=query)
-        print("Agent:", response.response)
+        handler = agent.run(user_msg=query)
+        async for event in handler.stream_events():
+            if isinstance(event, AgentStream):
+                print(event.delta, end="", flush=True)
+        print()
 
-# 6. Run the main function
 if __name__ == "__main__":
     asyncio.run(main())
