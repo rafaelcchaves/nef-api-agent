@@ -10,21 +10,25 @@ from llama_index.llms.ollama import Ollama
 from llama_index.vector_stores.chroma import ChromaVectorStore
 import chromadb
 
+OKGREEN = '\033[92m'
+BOLD = '\033[1m'
+ENDC = '\033[0m'
+
 CONTEXT_WINDOW=8000
 
-def get_traffic_influence_api_definition() -> str:
-    """Useful for getting the documentation of the traffic influence API."""
+def consult_traffic_influence_api() -> str:
+    """Consult the traffic influence OPEN-API description."""
+    print("\nDOCUMETATION\n")
     file_path = "./documents/ti_api.txt"
     with open(file_path, "r") as f:
         content = f.read()
     return content
 
-def run_rag_pipeline(
+def consult_nef_documentation(
     question: str,
 ) -> str:
-    """Useful for answering questions using a RAG pipeline.
-    The question to ask the RAG pipeline is 'question'.
-    """
+    """Search in Network Exposure Function Documentation text and concepts related to the question string parameter."""
+    print("\nRAG\n")
     db = chromadb.PersistentClient(path=Settings.rag_db_dir)
     chroma_collection = db.get_collection(Settings.rag_collection)
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
@@ -35,14 +39,18 @@ def run_rag_pipeline(
 
     return str(response)
 
-get_traffic_influence_api_definition_tool = FunctionTool.from_defaults(fn=get_traffic_influence_api_definition)
+consult_traffic_influence_api_tool = FunctionTool.from_defaults(
+    fn=consult_traffic_influence_api,
+    name="consult_traffic_influence_api",
+    description="Consult the traffic influence OPEN-API description."
+)
 
 run_rag_tool = FunctionTool.from_defaults(
-    fn=lambda question: run_rag_pipeline(
+    fn=lambda question: consult_nef_documentation(
         question=question,
     ),
-    name="run_rag_pipeline",
-    description="Useful for answering questions using a RAG pipeline."
+    name="consult_nef_documentation",
+    description="Search in Network Exposure Function Documentation text and concepts related to the question string parameter."
 )
 
 
@@ -69,28 +77,29 @@ async def main():
     Settings.rag_top_k = args.top_k
     Settings.rag_db_dir = args.db_dir
 
-    tools = [get_traffic_influence_api_definition_tool]
+    tools = []
     if args.rag:
+        tools.append(consult_traffic_influence_api_tool)
         tools.append(run_rag_tool)
 
     agent = FunctionAgent(
-        verbose=True,
         tools=tools,
         llm=llm,
-        system_prompt="You are a system expert specializing in the Network Exposure Function (NEF) of 5G networks. Your role is to accurately understand the user’s request and generate precise curl commands that perform the required NEF operations. To accomplish this, you must fully comprehend the user’s intent, consult the NEF API documentation or relevant 3GPP references, and use all available tools and knowledge to ensure correctness. Every curl command you produce should be syntactically accurate, secure, and include appropriate headers, authentication tokens, parameters, and HTTP methods according to the API specification. Your responses must be clear, ready-to-execute examples that reflect best practices in 5G NEF data exposure and security. Accuracy, completeness, and understanding of the user’s intent are vital before generating the final output."
+        system_prompt="BE CONCISE, BE DIRECT IN YOUR ANSWERS, DO NOT DETAIL. You are a system expert specializing in the Network Exposure Function (NEF) of 5G networks. Your role is to accurately understand the user’s request and generate precise curl commands that perform the required NEF operations. To accomplish this, you must fully comprehend the user’s intent, consult the NEF API documentation or relevant 3GPP references, read the traffic influence open api description and use all available tools and knowledge to ensure correctness. Every curl command you produce should be syntactically accurate, secure, and include appropriate headers, authentication tokens, parameters, and HTTP methods according to the API specification. Your responses must be clear, ready-to-execute examples that reflect best practices in 5G NEF data exposure and security. Accuracy, completeness, and understanding of the user’s intent are vital before generating the final output."
     )
 
     print(f"Agent initialized with Ollama model: {args.model}.")
     print("Type 'exit' to quit.")
     while True:
-        query = input("You: ")
+        query = input(f"{BOLD}You: {ENDC} ")
         if query.lower() == "exit":
             break
         handler = agent.run(user_msg=query)
+        print(f"{OKGREEN}", end="")
         async for event in handler.stream_events():
             if isinstance(event, AgentStream):
                 print(event.delta, end="", flush=True)
-        print()
+        print(f"{ENDC}")
 
 if __name__ == "__main__":
     asyncio.run(main())
