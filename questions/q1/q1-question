@@ -1,3 +1,0 @@
-Q: What is the Network Exposure Function (NEF) in 5G systems?
-
-A: The Network Exposure Function (NEF) is a functional element in 5G systems that securely exposes network capabilities and events provided by 3GPP network functions (NFs) to Application Functions (AFs). It enables AFs to access network services and securely provide information to the 3GPP network, including authentication, authorization, and information translation between AF and internal network NFs.
