@@ -1,6 +1,11 @@
 import asyncio
 import os
 import argparse
+from llama_index.tools.mcp import BasicMCPClient
+from llama_index.tools.mcp import (
+    get_tools_from_mcp_url,
+    aget_tools_from_mcp_url,
+)
 from llama_index.core.agent import FunctionAgent
 from llama_index.core.agent.workflow import AgentStream
 from llama_index.core import Settings, VectorStoreIndex
@@ -65,7 +70,6 @@ async def main():
     parser.add_argument("-db", "--db-dir", type=str, default="./chroma_db", help="The directory of the ChromaDB database.")
     parser.add_argument("--rag", action="store_true", help="Enable the RAG pipeline tool.")
     args = parser.parse_args()
-    print(args.model)
     base_url = f"http://{args.host}:11434"
     llm = Ollama(model=args.model, base_url=base_url, context_window=CONTEXT_WINDOW, request_timeout=120.0)
     Settings.llm = llm
@@ -73,19 +77,22 @@ async def main():
         model_name=args.embed_model,
         base_url=base_url,
     )
+
     Settings.rag_collection = args.collection
     Settings.rag_top_k = args.top_k
     Settings.rag_db_dir = args.db_dir
 
-    tools = []
+    local_client = BasicMCPClient("http://localhost:8080/sse")
+    tools = await aget_tools_from_mcp_url("http://localhost:8080/sse", client=local_client)
     if args.rag:
         tools.append(consult_traffic_influence_api_tool)
         tools.append(run_rag_tool)
 
+
     agent = FunctionAgent(
         tools=tools,
         llm=llm,
-        system_prompt="BE CONCISE, BE DIRECT IN YOUR ANSWERS, DO NOT DETAIL. You are a system expert specializing in the Network Exposure Function (NEF) of 5G networks. Your role is to accurately understand the user’s request and generate precise curl commands that perform the required NEF operations. To accomplish this, you must fully comprehend the user’s intent, consult the NEF API documentation or relevant 3GPP references, read the traffic influence open api description and use all available tools and knowledge to ensure correctness. Every curl command you produce should be syntactically accurate, secure, and include appropriate headers, authentication tokens, parameters, and HTTP methods according to the API specification. Your responses must be clear, ready-to-execute examples that reflect best practices in 5G NEF data exposure and security. Accuracy, completeness, and understanding of the user’s intent are vital before generating the final output."
+        system_prompt="You are a system expert specializing in the Network Exposure Function (NEF) of 5G networks. Your role is to accurately understand the user’s request and generate precise curl commands that perform the required NEF operations. To accomplish this, you must fully comprehend the user’s intent, consult the NEF API documentation or relevant 3GPP references, read the traffic influence open api description and use all available tools and knowledge to ensure correctness."
     )
 
     print(f"Agent initialized with Ollama model: {args.model}.")

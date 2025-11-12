@@ -1,0 +1,3 @@
+Traffic Influence API Purpose in 3GPP:
+
+The 3GPP Traffic Influence API enables Application Functions (AFs) to influence the routing behavior of User Plane Functions (UPFs) within the 5G core network. Its primary purpose is to allow applications to express their traffic handling requirements and preferences to the network, facilitating optimized traffic steering. This includes directing traffic to specific Data Network Access Identifiers (DNAIs), such as Multi-access Edge Computing (MEC) hosts, or applying specific traffic filters to ensure desired Quality of Service (QoS) or to meet application-specific routing needs.
