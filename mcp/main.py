@@ -1,3 +1,4 @@
+import argparse
 from fastmcp import FastMCP
 from methods import ( 
     get_all_subscriptions,
@@ -9,6 +10,17 @@ from methods import (
 )
 
 API_ROOT = "http://10.100.200.6:8000"
+
+parser = argparse.ArgumentParser(description="FastMCP Agent for NEF interactions.")
+parser.add_argument(
+    "-H",
+    "--nef-url",
+    type=str,
+    default=API_ROOT,
+    help="URL of the NEF (Network Exposure Function) API.",
+)
+args = parser.parse_args()
+API_ROOT = args.nef_url
 
 mcp = FastMCP()
 
