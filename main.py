@@ -7,16 +7,17 @@ from llama_index.tools.mcp import (
 )
 from llama_index.core.agent import FunctionAgent
 from llama_index.core.agent.workflow import AgentStream
+from llama_index.core.llms import ChatMessage
 from llama_index.core import Settings
-from llama_index.embeddings.ollama import OllamaEmbedding
+
 from llama_index.llms.ollama import Ollama
-from rag import add_rag_args, setup_rag_tools
+from rich.console import Console
+from rich.panel import Panel
+from rich.syntax import Syntax
 
-OKGREEN = "\033[92m"
-BOLD = "\033[1m"
-ENDC = "\033[0m"
 
-CONTEXT_WINDOW = 8000
+
+CONTEXT_WINDOW = 16000
 
 
 async def main():
@@ -35,62 +36,86 @@ async def main():
         default="localhost",
         help="The host for the Ollama models.",
     )
-    parser.add_argument(
-        "-e",
-        "--embed-model",
-        type=str,
-        default="bge-m3",
-        help="The name of the embedding model to use.",
-    )
-    add_rag_args(parser)
+
+
     args = parser.parse_args()
     base_url = f"http://{args.host}:11434"
     llm = Ollama(
         model=args.model,
         base_url=base_url,
+        keep_alive = "1m",
         context_window=CONTEXT_WINDOW,
         request_timeout=120.0,
     )
     Settings.llm = llm
-    Settings.embed_model = OllamaEmbedding(
-        model_name=args.embed_model,
-        base_url=base_url,
-    )
+
 
     local_client = BasicMCPClient("http://localhost:8080/sse")
     tools = await aget_tools_from_mcp_url(
         "http://localhost:8080/sse", client=local_client
     )
-    tools.extend(setup_rag_tools(args))
+
+    prompt1 = '''
+                You are a helpful agent. You are a system expert specializing in the Network Exposure Function (NEF) of 5G networks.
+                Your role is to accurately understand the user’s request and use the available tools to perform the required operations.
+    '''
+
+    prompt2 = '''
+        You are an intelligent 5G network traffic management assistant.
+
+        Your role is to analyze network performance metrics and make decisions about traffic routing
+        between Internet path and MEC (Multi-access Edge Computing) path.
+
+        **Decision Criteria:**
+        - If jitter > 30ms AND throughput < 20Mbps: Consider redirecting to MEC edge cloud
+        - If performance is adequate: Maintain normal internet routing
+        - Always check existing traffic influences before creating new ones
+        - Avoid oscillation - be conservative with routing changes
+
+        **Analysis Process:**
+        1. Review the network metrics (throughput, jitter, packet loss)
+        2. Evaluate if performance degradation warrants action
+        3. Check for existing traffic influences
+        4. Make a reasoned decision
+        5. Execute appropriate tool calls if needed
+        6. Provide clear reasoning for your decisions
+
+        **IMPORTANT:** After executing tools, always provide your final answer immediately.
+        Do not keep calling tools repeatedly. Make your decision and state your conclusion.
+
+        Always explain your thought process and be transparent about why you're taking specific actions.
+    '''
+
 
     agent = FunctionAgent(
         tools=tools,
         llm=llm,
         system_prompt=(
-            "You are a system expert specializing in the Network Exposure "
-            "Function (NEF) of 5G networks. Your role is to accurately "
-            "understand the user’s request and generate precise curl commands "
-            "that perform the required NEF operations. To accomplish this, you "
-            "must fully comprehend the user’s intent, consult the NEF API "
-            "documentation or relevant 3GPP references, read the traffic "
-            "influence open api description and use all available tools and "
-            "knowledge to ensure correctness."
+            prompt2
         ),
     )
 
-    print(f"Agent initialized with Ollama model: {args.model}.")
-    print("Type 'exit' to quit.")
+    console = Console()
+    chat_history = []
+    console.print(f"Agent initialized with Ollama model: [bold]{args.model}[/bold].")
+    console.print("Type 'exit' to quit.")
     while True:
-        query = input(f"{BOLD}You: {ENDC} ")
+        query = console.input(f"[bold]You: [/bold]")
         if query.lower() == "exit":
             break
-        handler = agent.run(user_msg=query)
-        print(f"{OKGREEN}", end="")
+        
+        chat_history.append(ChatMessage(role="user", content=query))
+        handler = agent.run(user_msg=query, chat_history=chat_history)
+        
+        response = ""
+        console.print(f"[green]Agent:", end="")
         async for event in handler.stream_events():
             if isinstance(event, AgentStream):
-                print(event.delta, end="", flush=True)
-        print(f"{ENDC}")
-
+                response += event.delta
+                console.print(event.delta, end="", style="green")
+        console.print()
+        
+        chat_history.append(ChatMessage(role="assistant", content=response))
 
 if __name__ == "__main__":
     asyncio.run(main())
