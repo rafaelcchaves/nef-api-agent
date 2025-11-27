@@ -38,6 +38,15 @@ async def main():
     )
 
 
+    parser.add_argument(
+        "-M",
+        "--mcp-server",
+        type=str,
+        default="http://localhost:8080/sse",
+        help="The URL of the MCP server.",
+    )
+
+
     args = parser.parse_args()
     base_url = f"http://{args.host}:11434"
     llm = Ollama(
@@ -50,9 +59,9 @@ async def main():
     Settings.llm = llm
 
 
-    local_client = BasicMCPClient("http://localhost:8080/sse")
+    local_client = BasicMCPClient(args.mcp_server)
     tools = await aget_tools_from_mcp_url(
-        "http://localhost:8080/sse", client=local_client
+        args.mcp_server, client=local_client
     )
 
     prompt1 = '''
