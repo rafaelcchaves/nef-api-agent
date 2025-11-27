@@ -1,0 +1,6 @@
+[submodule "free5gc"]
+	path = free5gc
+	url = https://github.com/free5gc/free5gc-compose.git
+[submodule "gtp5g"]
+	path = gtp5g
+	url = https://github.com/free5gc/gtp5g.git
