@@ -22,7 +22,7 @@ parser.add_argument(
 args = parser.parse_args()
 API_ROOT = args.nef_url
 
-mcp = FastMCP()
+mcp = FastMCP(host='0.0.0.0')
 
 @mcp.tool()
 def list_subscriptions(af_id: str):
