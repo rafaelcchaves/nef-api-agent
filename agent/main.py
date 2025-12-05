@@ -95,6 +95,8 @@ async def main():
                 response += event.delta
                 console.print(event.delta, end="", style="green")
         console.print()
+        break
+
         
         chat_history.append(ChatMessage(role="assistant", content=response))
 

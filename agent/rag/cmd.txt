@@ -1,0 +1,2 @@
+python3 test_rag.py  'Create a 5G Traffic Influence Subscription payload for Application Function af001 and Service1. It should target the internet DNN on Slice 1 (SD 010203). This rule applies to any UE. Route traffic to the 'mec' DNAI if it matches the flow 'permit out ip from 8.8.8.8 to 10.60.0.0/16'. Send any notifications to http://af:8000/test123' -e all-minilm:latest -k 5 -m qwen3:4b-instruct-2507-q4_K_M
+
