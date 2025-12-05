@@ -14,6 +14,7 @@ from llama_index.llms.ollama import Ollama
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
+from rag.rag import RAGPipeline
 
 
 
@@ -63,6 +64,9 @@ async def main():
     tools = await aget_tools_from_mcp_url(
         args.mcp_server, client=local_client
     )
+
+    rag = RAGPipeline(host=args.host, llm_model=args.model)
+    tools.append(rag.get_tool())
 
     prompt = ''' 
         You are a helpful agent.
