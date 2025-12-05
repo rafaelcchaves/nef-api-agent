@@ -4,6 +4,7 @@ import logging
 import sys
 
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
+from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.readers.file import PyMuPDFReader
 
@@ -61,6 +62,7 @@ def main():
         base_url=ollama_base_url,
     )
     Settings.llm = None
+    Settings.text_splitter = SentenceSplitter(chunk_size=512, chunk_overlap=128)
 
     print("Creating vector store index...")
     index = VectorStoreIndex.from_documents(
