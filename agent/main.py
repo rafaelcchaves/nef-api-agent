@@ -2,10 +2,13 @@ import asyncio
 import argparse
 import time
 import json
+import ast
+import re
 import tiktoken
 from typing import Any, Dict, List, Optional
 from llama_index.core.callbacks import CallbackManager, TokenCountingHandler, CBEventType, EventPayload
 from llama_index.tools.mcp import BasicMCPClient
+from llama_index.core.agent.workflow.workflow_events import ToolCallResult, ToolCall, AgentOutput
 from llama_index.tools.mcp import (
     get_tools_from_mcp_url,
     aget_tools_from_mcp_url,
@@ -14,10 +17,14 @@ from llama_index.core.agent import FunctionAgent
 from llama_index.core.agent.workflow import AgentStream
 from llama_index.core.llms import ChatMessage
 from llama_index.core import Settings
-
+from mcp.types import CallToolResult
 from llama_index.llms.ollama import Ollama
 from rag.rag import RAGPipeline
+from llama_index.core.callbacks.base_handler import BaseCallbackHandler
 import sys
+
+
+
 
 
 CONTEXT_WINDOW = 16000
@@ -63,7 +70,7 @@ async def main():
     base_url = f"http://{args.host}:11434"
     llm = Ollama(
         streaming = True,
-        thinking = True,
+        thinking = False,
         model=args.model,
         base_url=base_url,
         keep_alive = "2m",
@@ -78,11 +85,7 @@ async def main():
     )
 
     rag = RAGPipeline(host=args.host, llm_model=args.model)
-    tools.extend(rag.get_tools()) # Changed from .append(rag.get_tool()) to .extend(rag.get_tools())
-
-    if args.verbose:
-        tool_names = [t.metadata.name for t in tools]
-        print(f"--- Loaded Tools: {tool_names} ---")
+    tools.extend(rag.get_tools()) 
 
     prompt = (
         "You are a helpful agent.\n"
@@ -92,16 +95,11 @@ async def main():
         "STRICT EXECUTION PLAN:\n"
         "1. First, you MUST call the tool 'get_subscription_schema' to retrieve the valid JSON structure for 'subscription_data'. DO NOT guess the structure.\n"
         "2. Analyze the user's request and map it to the schema fields you just retrieved.\n"
-        "3. Verbalize your plan using 'Thought: ...' to explain how you constructed the payload.\n"
+        "3. Verbalize your plan to explain how you constructed the payload.\n"
         "4. Finally, call 'add_subscription' with the correctly formatted 'subscription_data'.\n"
         "\n"
         "CRITICAL: You are FORBIDDEN from calling 'add_subscription' without first calling 'get_subscription_schema'.\n"
     )
-    
-    if args.verbose:
-        print("\n--- System Prompt ---\n")
-        print(prompt)
-        print("\n---------------------\n")
 
     agent = FunctionAgent(
         tools=tools,
@@ -112,37 +110,53 @@ async def main():
 
     query = args.query
 
-    if args.verbose:
-        print("\n--- User Query ---\n")
-        print(query)
-        print("\n------------------\n")
+    # Print initial system prompt and user query once
+    print(f"\n[SYSTEM PROMPT]\n\n{prompt}")
+    print(f"\n[USER PROMPT]\n\n{query}")
 
     token_counter.reset_counts() 
     start_time = time.time()
 
     handler = agent.run(user_msg=query, chat_history=chat_history)
-    
+    state = "init"
     response = ""
+    print("\n[RESPONSE]\n") 
     async for event in handler.stream_events():
         if isinstance(event, AgentStream):
-            response += event.delta
-        elif args.verbose and hasattr(event, 'tool_name') and hasattr(event, 'tool_kwargs'): # For ToolCall
-            print(f"\n--- Tool Call: {event.tool_name} ---\n")
-            print(f"Arguments: {json.dumps(event.tool_kwargs, indent=2)}")
-            print("\n-----------------------\n")
-        elif args.verbose and hasattr(event, 'tool_output'): # For ToolOutput
-            print(f"\n--- Tool Output ---\n")
-            print(str(event.tool_output))
-            print("\n-------------------\n")
-    
-    if response:
-        print("\n--- Agent Response ---\n")
-        print(response)
-        print("\n----------------------\n")
-    else:
-        print("\n--- Error ---\n")
-        print("No response generated. The model might have failed to produce output or encountered an error.")
-        print("\n-------------\n")
+            if event.thinking_delta:
+                if state != "thinking":
+                    print("\n<think/>")
+                    state = "thinking"
+                print(event.thinking_delta, end="", flush=True)
+            elif event.delta:
+                if state == "thinking":
+                    print("</think>")
+                response += event.delta
+                print(event.delta, end="", flush=True)
+                state = "response"
+        else:
+            if state == "thinking": 
+                print("</think>")
+            if isinstance(event, ToolCall): # For ToolOutput
+                print("\n[TOOL CALL]\n")
+                print(event.tool_name)
+                print(json.dumps(event.tool_kwargs, indent=4))
+                state = "tool_call"
+            elif isinstance(event, ToolCallResult):
+                print("\n[TOOL RESPONSE]\n")
+                print(event.tool_name)
+                output = event.tool_output.raw_output
+                if isinstance(output, CallToolResult):
+                    print(json.dumps(output.structuredContent, indent=4))
+                elif isinstance(output, dict):
+                    print(json.dumps(output, indent=4))
+                print()
+                state = "tool_response"
+            elif isinstance(event, AgentOutput):
+                state = "output"
+            else:
+                state = "unknown"
+
 
     end_time = time.time()
     processing_time = end_time - start_time

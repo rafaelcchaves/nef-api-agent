@@ -9,3 +9,4 @@ rich
 llama-index-embeddings-ollama
 pymupdf
 llama-index-readers-file
+tiktoken
