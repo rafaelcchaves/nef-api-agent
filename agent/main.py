@@ -84,9 +84,6 @@ async def main():
         args.mcp_server, client=local_client
     )
 
-    rag = RAGPipeline(host=args.host, llm_model=args.model)
-    tools.extend(rag.get_tools()) 
-
     prompt = (
         "You are a helpful agent.\n"
         "You are a system expert specialized in the Network Exposure Function (NEF) of 5G networks.\n"
