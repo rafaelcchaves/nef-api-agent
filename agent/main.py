@@ -56,6 +56,9 @@ async def main():
         "-v", "--verbose", action="store_true", help="Enable verbose logging of LLM prompts and inputs."
     )
     parser.add_argument(
+        "-t", "--thinking", action="store_true", help="Enable thinking mode."
+    )
+    parser.add_argument(
         "query", type=str, help="The query to be processed by the agent."
     )
     args = parser.parse_args()        
@@ -70,7 +73,7 @@ async def main():
     base_url = f"http://{args.host}:11434"
     llm = Ollama(
         streaming = True,
-        thinking = False,
+        thinking = args.thinking,
         model=args.model,
         base_url=base_url,
         keep_alive = "2m",
