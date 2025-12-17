@@ -74,63 +74,6 @@ class RAGPipeline:
         response = self.query_engine.query(query_str)
         return str(response)
 
-    def get_subscription_schema(self) -> dict:
-        """
-        Retrieves the JSON schema for a 5G Traffic Influence subscription.
-        Use this tool to understand the required structure and fields when creating or updating subscriptions.
-        """
-        return {
-            "type": "object",
-            "properties": {
-                "afServiceId": {"type": "string", "description": "Identifier of the AF service"},
-                "dnn": {"type": "string", "description": "Data Network Name"},
-                "snssai": {
-                    "type": "object",
-                    "properties": {
-                        "sst": {"type": "integer", "description": "Slice/Service Type"},
-                        "sd": {"type": "string", "description": "Slice Differentiator"}
-                    },
-                    "required": ["sst", "sd"]
-                },
-                "anyUeInd": {"type": "boolean", "description": "Indicates whether the subscription applies to any UE"},
-                "notificationDestination": {"type": "string", "description": "URL to send notifications"},
-                "trafficFilters": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "flowId": {"type": "integer", "description": "Flow identifier"},
-                            "flowDescriptions": {
-                                "type": "array",
-                                "items": {"type": "string", "description": "Description of the traffic flow (e.g., IP filter)"}
-                            }
-                        },
-                        "required": ["flowId", "flowDescriptions"]
-                    }
-                },
-                "trafficRoutes": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "dnai": {"type": "string", "description": "Data Network Access Identifier"}
-                        },
-                        "required": ["dnai"]
-                    }
-                },
-                "appReloInd": {"type": "boolean", "description": "Indicates whether application relocation is allowed (for PATCH/PUT)"}
-            },
-            "required": [
-                "afServiceId",
-                "dnn",
-                "snssai",
-                "anyUeInd",
-                "notificationDestination",
-                "trafficFilters",
-                "trafficRoutes"
-            ]
-        }
-
     def get_tools(self) -> List[FunctionTool]:
         """
         Returns a list of LlamaIndex FunctionTools provided by the RAG pipeline.
@@ -140,9 +83,4 @@ class RAGPipeline:
             name="search_documentation",
             description="Useful for searching technical documentation and specifications related to NEF and 5G APIs. Use this tool when you need specific details about API endpoints, data structures, or 3GPP specifications."
         )
-        schema_tool = FunctionTool.from_defaults(
-            fn=self.get_subscription_schema,
-            name="get_subscription_schema",
-            description="Retrieves the JSON schema for 5G Traffic Influence subscriptions. Use this to understand the required structure and fields when constructing a subscription payload for tools like 'add_subscription'."
-        )
-        return [search_tool, schema_tool]
+        return [search_tool]
