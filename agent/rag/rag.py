@@ -1,8 +1,6 @@
 from typing import List
 import os
-from llama_index.core import StorageContext, load_index_from_storage, Settings
-from llama_index.core.tools import FunctionTool
-from llama_index.core.response_synthesizers import ResponseMode
+from llama_index.core import StorageContext, load_index_from_storage, Settings, PromptTemplate
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.llms.ollama import Ollama
 
@@ -12,13 +10,15 @@ class RAGPipeline:
                  llm_model: str = "qwen3:1.7b", 
                  embed_model: str = "all-minilm:latest",
                  vector_store_dir: str = "rag/vector_store",
-                 top_k: int = 6):
+                 top_k: int = 6,
+                 thinking: bool = False):
         
         self.ollama_base_url = f"http://{host}:11434"
         self.llm_model_name = llm_model
         self.embed_model_name = embed_model
         self.vector_store_dir = vector_store_dir
         self.top_k = top_k
+        self.thinking = thinking
         self.query_engine = None
         
         self._initialize()
@@ -35,7 +35,7 @@ class RAGPipeline:
             model=self.llm_model_name,
             keep_alive="1m",
             base_url=self.ollama_base_url,
-            thinking=False,
+            thinking=self.thinking,
             temperature=0.3,
             request_timeout=120.0,
             context_window=4096,
@@ -56,12 +56,26 @@ class RAGPipeline:
 
         storage_context = StorageContext.from_defaults(persist_dir=final_vector_store_dir)
         index = load_index_from_storage(storage_context)
+
+        # Custom Prompt Template for Query Rewriting
+        template = (
+            "We have provided context information below. \n"
+            "---------------------\n"
+            "{context_str}"
+            "\n---------------------\n"
+            "Given this information, please rewrite the following user query to be a precise, technical instruction for an AI agent that has access to 5G NEF API tools. "
+            "Include specific API names, parameters, or data structures found in the context if relevant. "
+            "Do not answer the query yourself. Just output the rewritten prompt.\n"
+            "User Query: {query_str}\n"
+            "Rewritten Prompt: "
+        )
+        qa_template = PromptTemplate(template)
         
         self.query_engine = index.as_query_engine(
             llm=self.llm,
             embed_model=self.embed_model,
             similarity_top_k=self.top_k,
-            response_mode=ResponseMode.SIMPLE_SUMMARIZE
+            text_qa_template=qa_template
         )
 
     def query(self, query_str: str) -> str:
@@ -73,14 +87,3 @@ class RAGPipeline:
         
         response = self.query_engine.query(query_str)
         return str(response)
-
-    def get_tools(self) -> List[FunctionTool]:
-        """
-        Returns a list of LlamaIndex FunctionTools provided by the RAG pipeline.
-        """
-        search_tool = FunctionTool.from_defaults(
-            fn=self.query,
-            name="search_documentation",
-            description="Useful for searching technical documentation and specifications related to NEF and 5G APIs. Use this tool when you need specific details about API endpoints, data structures, or 3GPP specifications."
-        )
-        return [search_tool]

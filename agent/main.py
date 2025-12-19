@@ -59,6 +59,27 @@ async def main():
         "-t", "--thinking", action="store_true", help="Enable thinking mode."
     )
     parser.add_argument(
+        "--rag", action="store_true", help="Enable RAG pre-processing."
+    )
+    parser.add_argument(
+        "--rag-embed-model",
+        type=str,
+        default="all-minilm:latest",
+        help="The name of the Ollama embedding model to use for RAG (default: 'all-minilm:latest').",
+    )
+    parser.add_argument(
+        "--rag-top-k",
+        type=int,
+        default=6,
+        help="The number of top matching documents to retrieve (default: 6).",
+    )
+    parser.add_argument(
+        "--rag-llm-model",
+        type=str,
+        default=None,
+        help="The name of the Ollama model to use for RAG generation. Defaults to the main model if not specified.",
+    )
+    parser.add_argument(
         "query", type=str, help="The query to be processed by the agent."
     )
     args = parser.parse_args()        
@@ -83,9 +104,39 @@ async def main():
     Settings.llm = llm
 
     local_client = BasicMCPClient(args.mcp_server)
-    tools = await aget_tools_from_mcp_url(
-        args.mcp_server, client=local_client
-    )
+    try:
+        tools = await aget_tools_from_mcp_url(
+            args.mcp_server, client=local_client
+        )
+    except Exception as e:
+        print(f"\n[FATAL ERROR] Could not connect to MCP server at {args.mcp_server}.")
+        print("Please confirm if the MCP server is running and accessible at the specified host/URL.")
+        sys.exit(1)
+
+    # RAG Pre-processing
+    if args.rag:
+        rag_llm_model = args.rag_llm_model if args.rag_llm_model else args.model
+        print(f"\n[RAG] Initializing RAG Pipeline with LLM: {rag_llm_model}, Embed Model: {args.rag_embed_model}, Top-K: {args.rag_top_k}...")
+        try:
+            rag = RAGPipeline(
+                host=args.host, 
+                llm_model=rag_llm_model, 
+                embed_model=args.rag_embed_model,
+                top_k=args.rag_top_k,
+                thinking=args.thinking
+            )
+            print(f"[RAG] Processing query: {args.query}")
+            improved_prompt = rag.query(args.query)
+            print(f"[RAG] Improved Prompt:\n{improved_prompt}\n")
+            
+            # Update the query to be used by the agent
+            query = improved_prompt
+        except Exception as e:
+            print(f"[RAG] Error during RAG processing: {e}")
+            print("[RAG] Proceeding with original query.")
+            query = args.query
+    else:
+        query = args.query
 
     prompt = (
         "You are a helpful agent.\n"
