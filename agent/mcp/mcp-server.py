@@ -25,61 +25,7 @@ API_ROOT = args.nef_url
 mcp = FastMCP(host='0.0.0.0')
 
 
-def _subscription_schema_dict() -> dict:
-    """
-    Shared JSON schema for a 3GPP Traffic Influence subscription.
-    """
-    return {
-        "type": "object",
-        "properties": {
-            "afServiceId": {"type": "string", "description": "Identifier of the AF service"},
-            "dnn": {"type": "string", "description": "Data Network Name"},
-            "snssai": {
-                "type": "object",
-                "properties": {
-                    "sst": {"type": "integer", "description": "Slice/Service Type"},
-                    "sd": {"type": "string", "description": "Slice Differentiator"}
-                },
-                "required": ["sst", "sd"]
-            },
-            "anyUeInd": {"type": "boolean", "description": "Indicates whether the subscription applies to any UE"},
-            "notificationDestination": {"type": "string", "description": "URL to send notifications"},
-            "trafficFilters": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "flowId": {"type": "integer", "description": "Flow identifier"},
-                        "flowDescriptions": {
-                            "type": "array",
-                            "items": {"type": "string", "description": "Description of the traffic flow (e.g., IP filter)"}
-                        }
-                    },
-                    "required": ["flowId", "flowDescriptions"]
-                }
-            },
-            "trafficRoutes": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "dnai": {"type": "string", "description": "Data Network Access Identifier"}
-                    },
-                    "required": ["dnai"]
-                }
-            },
-            "appReloInd": {"type": "boolean", "description": "Indicates whether application relocation is allowed (for PATCH/PUT)"}
-        },
-        "required": [
-            "afServiceId",
-            "dnn",
-            "snssai",
-            "anyUeInd",
-            "notificationDestination",
-            "trafficFilters",
-            "trafficRoutes"
-        ]
-    }
+
 
 @mcp.tool()
 def list_subscriptions(af_id: str):
@@ -101,7 +47,7 @@ def add_subscription(
     Creates a new Traffic Influence subscription for a given Application Function (AF).
 
     :param af_id: The identifier of the Application Function.
-    :param subscription_data: A dictionary containing the subscription details. Use the 'subscription_schema' resource to see the expected structure.
+    :param subscription_data: A dictionary containing the subscription details. The expected structure is provided in the system prompt when --rag flag is used.
     :return: A JSON object representing the newly created subscription.
     """
     response = create_subscription(API_ROOT, af_id, subscription_data)
@@ -130,7 +76,7 @@ def update_full_subscription(
 
     :param af_id: The identifier of the Application Function.
     :param subscription_id: The identifier of the subscription to update.
-    :param subscription_data: A dictionary containing the new subscription details. Use the 'subscription_schema' resource to see the expected structure.
+    :param subscription_data: A dictionary containing the new subscription details. The expected structure is provided in the system prompt when --rag flag is used.
     :return: A JSON object representing the updated subscription.
     """
     response = update_subscription(API_ROOT, af_id, subscription_id, subscription_data)
@@ -165,23 +111,7 @@ def remove_subscription(af_id: str, subscription_id: str):
         return {"status": "Subscription deleted successfully"}
     return response.json()
 
-@mcp.tool()
-def get_subscription_schema():
-    """
-    Retrieves the JSON schema for a 3GPP Traffic Influence subscription.
-    Use this tool to understand the required structure and fields when creating or updating subscriptions.
-    """
-    return _subscription_schema_dict()
 
-
-@mcp.resource("data://subscription_schema")
-def subscription_schema():
-    """
-    Provides the JSON schema for a 3GPP Traffic Influence subscription as a static resource.
-    This schema defines the structure and data types required when creating or updating a subscription.
-    Use this to ensure the 'subscription_data' dictionary is correctly formatted.
-    """
-    return _subscription_schema_dict()
 
 if __name__ == "__main__":
     mcp.run(transport="sse", port=8080)

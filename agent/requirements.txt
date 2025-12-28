@@ -3,10 +3,6 @@ llama-index-core
 llama-index-embeddings-ollama
 llama-index-llms-ollama
 llama-index-tools-mcp
-llama-index-vector-stores-chroma
 llama-index-workflows
 rich
-llama-index-embeddings-ollama
-pymupdf
-llama-index-readers-file
 tiktoken

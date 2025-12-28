@@ -2,11 +2,9 @@ import asyncio
 import argparse
 import time
 import json
-import ast
-import re
 import tiktoken
 from typing import Any, Dict, List, Optional
-from llama_index.core.callbacks import CallbackManager, TokenCountingHandler, CBEventType, EventPayload
+from llama_index.core.callbacks import CallbackManager, TokenCountingHandler
 from llama_index.tools.mcp import BasicMCPClient
 from llama_index.core.agent.workflow.workflow_events import ToolCallResult, ToolCall, AgentOutput
 from llama_index.tools.mcp import (
@@ -19,7 +17,6 @@ from llama_index.core.llms import ChatMessage
 from llama_index.core import Settings
 from mcp.types import CallToolResult
 from llama_index.llms.ollama import Ollama
-from rag.rag import RAGPipeline
 from llama_index.core.callbacks.base_handler import BaseCallbackHandler
 import sys
 
@@ -28,6 +25,59 @@ import sys
 
 
 CONTEXT_WINDOW = 16000
+
+# 3GPP Traffic Influence Subscription Schema
+SUBSCRIPTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "afServiceId": {"type": "string", "description": "Identifier of the AF service"},
+        "dnn": {"type": "string", "description": "Data Network Name"},
+        "snssai": {
+            "type": "object",
+            "properties": {
+                "sst": {"type": "integer", "description": "Slice/Service Type"},
+                "sd": {"type": "string", "description": "Slice Differentiator"}
+            },
+            "required": ["sst", "sd"]
+        },
+        "anyUeInd": {"type": "boolean", "description": "Indicates whether the subscription applies to any UE"},
+        "notificationDestination": {"type": "string", "description": "URL to send notifications"},
+        "trafficFilters": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "flowId": {"type": "integer", "description": "Flow identifier"},
+                    "flowDescriptions": {
+                        "type": "array",
+                        "items": {"type": "string", "description": "Description of the traffic flow (e.g., IP filter)"}
+                    }
+                },
+                "required": ["flowId", "flowDescriptions"]
+            }
+        },
+        "trafficRoutes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "dnai": {"type": "string", "description": "Data Network Access Identifier"}
+                },
+                "required": ["dnai"]
+            }
+        },
+        "appReloInd": {"type": "boolean", "description": "Indicates whether application relocation is allowed (for PATCH/PUT)"}
+    },
+    "required": [
+        "afServiceId",
+        "dnn",
+        "snssai",
+        "anyUeInd",
+        "notificationDestination",
+        "trafficFilters",
+        "trafficRoutes"
+    ]
+}
 
 async def main():
     parser = argparse.ArgumentParser(description="Run a LlamaIndex function agent.")
@@ -56,28 +106,10 @@ async def main():
         "-v", "--verbose", action="store_true", help="Enable verbose logging of LLM prompts and inputs."
     )
     parser.add_argument(
-        "-t", "--thinking", action="store_true", help="Enable thinking mode."
+        "--rag", action="store_true", help="Include the schema directly in the system prompt."
     )
     parser.add_argument(
-        "--rag", action="store_true", help="Enable RAG pre-processing."
-    )
-    parser.add_argument(
-        "--rag-embed-model",
-        type=str,
-        default="all-minilm:latest",
-        help="The name of the Ollama embedding model to use for RAG (default: 'all-minilm:latest').",
-    )
-    parser.add_argument(
-        "--rag-top-k",
-        type=int,
-        default=6,
-        help="The number of top matching documents to retrieve (default: 6).",
-    )
-    parser.add_argument(
-        "--rag-llm-model",
-        type=str,
-        default=None,
-        help="The name of the Ollama model to use for RAG generation. Defaults to the main model if not specified.",
+        "-s", "--streaming", action="store_true", help="Enable streaming response mode."
     )
     parser.add_argument(
         "query", type=str, help="The query to be processed by the agent."
@@ -93,11 +125,10 @@ async def main():
 
     base_url = f"http://{args.host}:11434"
     llm = Ollama(
-        streaming = True,
-        thinking = args.thinking,
+        streaming=args.streaming,
         model=args.model,
         base_url=base_url,
-        keep_alive = "2m",
+        keep_alive="2m",
         context_window=CONTEXT_WINDOW,
         request_timeout=120.0,
     )
@@ -113,44 +144,63 @@ async def main():
         print("Please confirm if the MCP server is running and accessible at the specified host/URL.")
         sys.exit(1)
 
-    # RAG Pre-processing
-    if args.rag:
-        rag_llm_model = args.rag_llm_model if args.rag_llm_model else args.model
-        print(f"\n[RAG] Initializing RAG Pipeline with LLM: {rag_llm_model}, Embed Model: {args.rag_embed_model}, Top-K: {args.rag_top_k}...")
-        try:
-            rag = RAGPipeline(
-                host=args.host, 
-                llm_model=rag_llm_model, 
-                embed_model=args.rag_embed_model,
-                top_k=args.rag_top_k,
-                thinking=args.thinking
-            )
-            print(f"[RAG] Processing query: {args.query}")
-            improved_prompt = rag.query(args.query)
-            print(f"[RAG] Improved Prompt:\n{improved_prompt}\n")
-            
-            # Update the query to be used by the agent
-            query = improved_prompt
-        except Exception as e:
-            print(f"[RAG] Error during RAG processing: {e}")
-            print("[RAG] Proceeding with original query.")
-            query = args.query
-    else:
-        query = args.query
+    query = args.query
 
-    prompt = (
-        "You are a helpful agent.\n"
-        "You are a system expert specialized in the Network Exposure Function (NEF) of 5G networks.\n"
-        "Your role is to accurately understand the user’s request and use the available tools to perform the required operations.\n"
-        "\n"
-        "STRICT EXECUTION PLAN:\n"
-        "1. First, you MUST call the tool 'get_subscription_schema' to retrieve the valid JSON structure for 'subscription_data'. DO NOT guess the structure.\n"
-        "2. Analyze the user's request and map it to the schema fields you just retrieved.\n"
-        "3. Verbalize your plan to explain how you constructed the payload.\n"
-        "4. Finally, call 'add_subscription' with the correctly formatted 'subscription_data'.\n"
-        "\n"
-        "CRITICAL: You are FORBIDDEN from calling 'add_subscription' without first calling 'get_subscription_schema'.\n"
-    )
+    # Build system prompt based on whether --rag flag is used
+    if args.rag:
+        prompt = f"""You are an autonomous 5G Network Exposure Function (NEF) agent that receives natural language requests and use the available tools to execute traffic influence API and calls without user interaction. Execute operations independently while maintaining precision and transparency.
+
+**Schema Reference:**
+{json.dumps(SUBSCRIPTION_SCHEMA, indent=2)}
+
+**Autonomous Execution Protocol:**
+
+1. **Analyze**: Parse the user prompt to extract all possible parameters
+2. **Map & Infer**: Explicitly document how you map natural language elements to schema fields. For any missing required fields:
+   - Make reasonable, documented inferences from context
+   - Apply sensible defaults when no context exists (e.g., 24h time window, current timestamp)
+   - If critical fields are unresolvable, proceed with best-effort and flag the ambiguity
+3. **Plan**: Output a structured execution plan showing:
+   - Mapped parameters with values
+   - Assumptions made
+   - Default values used
+   - Tool(s) to be invoked
+4. **Execute**: Perform the API operation immediately using available tools
+5. **Complete**: When the task is completed, clearly inform the user that the operation has been successfully executed and end the call
+
+**Critical Constraints:**
+- Never fail silently—always document inference logic
+- Prefer conservative defaults over risky assumptions
+- If multiple interpretations exist, select the most probable and note alternatives
+- Log all parameter mappings for auditability
+- Treat ambiguities as warnings, not blockers
+- When task is completed, immediately inform completion and end"""
+    else:
+        prompt = """You are an autonomous 5G Network Exposure Function (NEF) agent that receives natural language requests and use the available tools to execute traffic influence API calls without user interaction. Execute operations independently while maintaining precision and transparency.
+
+**Autonomous Execution Protocol:**
+
+1. **Analyze**: Parse the user prompt to extract all possible parameters
+2. **Map & Infer**: Explicitly document how you map natural language elements to schema fields. For any missing required fields:
+   - Make reasonable, documented inferences from context  
+   - Apply sensible defaults when no context exists (e.g., 24h time window, current timestamp)
+   - If critical fields are unresolvable, proceed with best-effort and flag the ambiguity
+3. **Plan**: Output a structured execution plan showing:
+   - Mapped parameters with values
+   - Assumptions made
+   - Default values used
+   - Tool(s) to be invoked
+4. **Execute**: Perform the API operation immediately using available tools
+5. **Complete**: When the task is completed, clearly inform the user that the operation has been successfully executed and end the call
+
+**Critical Constraints:**
+- Never fail silently—always document inference logic
+- Prefer conservative defaults over risky assumptions
+- If multiple interpretations exist, select the most probable and note alternatives
+- Log all parameter mappings for auditability
+- Treat ambiguities as warnings, not blockers
+- When task is completed, immediately inform completion and end"""
+
 
     agent = FunctionAgent(
         tools=tools,
@@ -159,8 +209,6 @@ async def main():
     )
     chat_history = []
 
-    query = args.query
-
     # Print initial system prompt and user query once
     print(f"\n[SYSTEM PROMPT]\n\n{prompt}")
     print(f"\n[USER PROMPT]\n\n{query}")
@@ -168,45 +216,53 @@ async def main():
     token_counter.reset_counts() 
     start_time = time.time()
 
-    handler = agent.run(user_msg=query, chat_history=chat_history)
-    state = "init"
-    response = ""
-    print("\n[RESPONSE]\n") 
-    async for event in handler.stream_events():
-        if isinstance(event, AgentStream):
-            if event.thinking_delta:
-                if state != "thinking":
-                    print("\n<think/>")
-                    state = "thinking"
-                print(event.thinking_delta, end="", flush=True)
-            elif event.delta:
-                if state == "thinking":
-                    print("</think>")
-                response += event.delta
-                print(event.delta, end="", flush=True)
-                state = "response"
-        else:
-            if state == "thinking": 
-                print("</think>")
-            if isinstance(event, ToolCall): # For ToolOutput
-                print("\n[TOOL CALL]\n")
-                print(event.tool_name)
-                print(json.dumps(event.tool_kwargs, indent=4))
-                state = "tool_call"
-            elif isinstance(event, ToolCallResult):
-                print("\n[TOOL RESPONSE]\n")
-                print(event.tool_name)
-                output = event.tool_output.raw_output
-                if isinstance(output, CallToolResult):
-                    print(json.dumps(output.structuredContent, indent=4))
-                elif isinstance(output, dict):
-                    print(json.dumps(output, indent=4))
-                print()
-                state = "tool_response"
-            elif isinstance(event, AgentOutput):
-                state = "output"
+    # Execute based on streaming mode
+    print("\n[RESPONSE]\n")
+    if args.streaming:
+        # Streaming mode: process events as they arrive
+        handler = agent.run(user_msg=query, chat_history=chat_history)
+        state = "init"
+        response = ""
+        async for event in handler.stream_events():
+            if isinstance(event, AgentStream):
+                if event.thinking_delta:
+                    if state != "thinking":
+                        print("\n<think>")
+                        state = "thinking"
+                    print(event.thinking_delta, end="", flush=True)
+                elif event.delta:
+                    if state == "thinking":
+                        print("\n</think>")
+                    response += event.delta
+                    print(event.delta, end="", flush=True)
+                    state = "response"
             else:
-                state = "unknown"
+                if state == "thinking":
+                    print("\n</think>")
+                if isinstance(event, ToolCall): # For ToolOutput
+                    print("\n[TOOL CALL]\n")
+                    print(event.tool_name)
+                    print(json.dumps(event.tool_kwargs, indent=4))
+                    state = "tool_call"
+                elif isinstance(event, ToolCallResult):
+                    print("\n[TOOL RESPONSE]\n")
+                    print(event.tool_name)
+                    output = event.tool_output.raw_output
+                    if isinstance(output, CallToolResult):
+                        print(json.dumps(output.structuredContent, indent=4))
+                    elif isinstance(output, dict):
+                        print(json.dumps(output, indent=4))
+                    print()
+                    state = "tool_response"
+                elif isinstance(event, AgentOutput):
+                    state = "output"
+                else:
+                    state = "unknown"
+    else:
+        # Non-streaming mode: get complete response
+        response_obj = await agent.run(user_msg=query, chat_history=chat_history)
+        response = response_obj.response
+        print(response, end="", flush=True)
 
 
     end_time = time.time()
