@@ -3,7 +3,9 @@ import argparse
 import time
 import json
 import tiktoken
+import os
 from typing import Any, Dict, List, Optional
+from dotenv import load_dotenv
 from llama_index.core.callbacks import CallbackManager, TokenCountingHandler
 from llama_index.tools.mcp import BasicMCPClient
 from llama_index.core.agent.workflow.workflow_events import ToolCallResult, ToolCall, AgentOutput
@@ -17,8 +19,12 @@ from llama_index.core.llms import ChatMessage
 from llama_index.core import Settings
 from mcp.types import CallToolResult
 from llama_index.llms.ollama import Ollama
+from llama_index.llms.anthropic import Anthropic
 from llama_index.core.callbacks.base_handler import BaseCallbackHandler
 import sys
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 
@@ -86,14 +92,14 @@ async def main():
         "--model",
         type=str,
         default="llama3.2:latest",
-        help="The name of the Ollama model to use (e.g., 'llama2', 'mistral').",
+        help="The model to use. Use 'claude-...' for Anthropic Claude models (requires ANTHROPIC_API_KEY), or Ollama model names (e.g., 'llama3.2:latest', 'mistral') for local models.",
     )
     parser.add_argument(
         "-H",
         "--host",
         type=str,
         default="localhost",
-        help="The host for the Ollama models.",
+        help="The host for the Ollama models (ignored for Gemini models).",
     )
     parser.add_argument(
         "-M",
@@ -123,15 +129,32 @@ async def main():
     handlers = [token_counter]
     Settings.callback_manager = CallbackManager(handlers)
 
-    base_url = f"http://{args.host}:11434"
-    llm = Ollama(
-        streaming=args.streaming,
-        model=args.model,
-        base_url=base_url,
-        keep_alive="2m",
-        context_window=CONTEXT_WINDOW,
-        request_timeout=120.0,
-    )
+    # Choose LLM provider based on model name
+    if args.model.lower().startswith("claude"):
+        # Use Anthropic API for Claude models
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            print("\n[FATAL ERROR] ANTHROPIC_API_KEY not found in environment variables.")
+            print("Please add ANTHROPIC_API_KEY to your .env file.")
+            sys.exit(1)
+        
+        llm = Anthropic(
+            model=args.model,
+            api_key=api_key,
+            max_tokens=12000,  # Must be greater than thinking budget
+            thinking_dict={"type": "enabled", "budget_tokens": 8000},
+        )
+    else:
+        # Use Ollama for local models
+        base_url = f"http://{args.host}:11434"
+        llm = Ollama(
+            streaming=args.streaming,
+            model=args.model,
+            base_url=base_url,
+            keep_alive="2m",
+            context_window=CONTEXT_WINDOW,
+            request_timeout=120.0,
+        )
     Settings.llm = llm
 
     local_client = BasicMCPClient(args.mcp_server)
