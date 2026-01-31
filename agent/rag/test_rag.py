@@ -65,18 +65,14 @@ def main():
 
     ollama_base_url = f"http://{args.host}:11434"
     Settings.llm = Ollama(
+        streaming = True,
         model=args.model,
         keep_alive = "1m",
         base_url=ollama_base_url,
-        thinking = False,
-        temperature = 0.3,
+        temperature = 0.0,
         request_timeout=120.0,
         context_window=4096,
         num_predict=256,
-        top_p=0.8,
-        top_k=20,
-        min_p=0,
-        presence_penalty=1.0
     )
     Settings.embed_model = OllamaEmbedding(
         model_name=args.embed_model,
@@ -92,7 +88,7 @@ def main():
 
     query_engine = index.as_query_engine(
         similarity_top_k=args.top_k,
-        response_mode=ResponseMode.SIMPLE_SUMMARIZE
+        response_mode=ResponseMode.COMPACT
     )
 
     token_counter.reset_counts() # Reset before query

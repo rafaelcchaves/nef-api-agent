@@ -72,11 +72,11 @@ python main.py
 You can customize the Ollama model and host, and the MCP server URL using command-line arguments:
 
 ```bash
-python main.py --model <model_name> --host <ollama_host> --mcp-server <mcp_server_url>
+python main.py --model <model_name> --host <ollama_host> --mcp-server <mcp_server_url> --thinking --rag
 ```
 
 **Example:**
 
 ```bash
-python main.py --model llama3.2:latest --host localhost --mcp-server http://localhost:8080/sse
+python main.py --model llama3.2:latest --host localhost --mcp-server http://localhost:8080/sse --rag
 ```
