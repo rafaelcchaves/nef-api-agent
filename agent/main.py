@@ -112,7 +112,7 @@ async def main():
         "-v", "--verbose", action="store_true", help="Enable verbose logging of LLM prompts and inputs."
     )
     parser.add_argument(
-        "--rag", action="store_true", help="Include the schema directly in the system prompt."
+        "--context_insertion", action="store_true", help="Include the schema directly in the system prompt."
     )
     parser.add_argument(
         "-s", "--streaming", action="store_true", help="Enable streaming response mode."
@@ -169,8 +169,8 @@ async def main():
 
     query = args.query
 
-    # Build system prompt based on whether --rag flag is used
-    if args.rag:
+    # Build system prompt based on whether --context_insertion flag is used
+    if args.context_insertion:
         prompt = f"""You are an autonomous 5G Network Exposure Function (NEF) agent that receives natural language requests and use the available tools to execute traffic influence API and calls without user interaction. Execute operations independently while maintaining precision and transparency.
 
 **Schema Reference:**
