@@ -91,8 +91,8 @@ async def main():
         "-m",
         "--model",
         type=str,
-        default="llama3.2:latest",
-        help="The model to use. Use 'claude-...' for Anthropic Claude models (requires ANTHROPIC_API_KEY), or Ollama model names (e.g., 'llama3.2:latest', 'mistral') for local models.",
+        default="qwen3:4b",
+        help="The model to use. Use 'claude-...' for Anthropic Claude models (requires ANTHROPIC_API_KEY), or Ollama model names (e.g., 'qwen3:4b', 'mistral') for local models.",
     )
     parser.add_argument(
         "-H",
