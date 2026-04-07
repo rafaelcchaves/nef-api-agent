@@ -1,4 +1,5 @@
 vector-stores
 .venv
 .env
+.vagrant
 __pycache__
